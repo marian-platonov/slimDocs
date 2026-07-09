@@ -1,6 +1,6 @@
 # 📄 SlimDocs
 
-Extract text from any file or URL and reformat it as Markdown, plain text, or chunked Claude-ready JSON — with token reduction stats.
+Extract text from any file or URL and reformat it as Markdown, plain text, or chunked Claude-ready JSON - with token reduction stats.
 
 ---
 
@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 ### 2. Install Tesseract (for image and PDF image OCR)
 
-> **Important:** `pytesseract` (the Python package installed above) and **Tesseract-OCR** (the actual OCR engine) are two separate things. Installing `pytesseract` alone is not enough — you must also install the Tesseract binary or OCR will silently fail.
+> **Important:** `pytesseract` (the Python package installed above) and **Tesseract-OCR** (the actual OCR engine) are two separate things. Installing `pytesseract` alone is not enough - you must also install the Tesseract binary or OCR will silently fail.
 
 | Component | What it is | Status after `pip install` |
 |-----------|------------|---------------------------|
@@ -37,7 +37,7 @@ pip install -r requirements.txt
 
 1. Go to: https://github.com/UB-Mannheim/tesseract/wiki
 2. Download and run the Windows installer (e.g. `tesseract-ocr-w64-setup-5.x.x.exe`)
-3. During install, note the path — default is `C:\Program Files\Tesseract-OCR\`
+3. During install, note the path - default is `C:\Program Files\Tesseract-OCR\`
 4. Add `C:\Program Files\Tesseract-OCR\` to your system `PATH`:
    - Open **Start** → search **"Environment Variables"** → **Edit the system environment variables**
    - Under **System variables**, select `Path` → **Edit** → **New** → paste the path
@@ -72,7 +72,7 @@ Instead of opening a terminal every time, create a Windows shortcut that starts 
    ```
    C:\Marian\Python Projects\AI projects\slimDocs
    ```
-4. Name it `slimDocs` — double-clicking it launches Streamlit in a new console window and opens the app in your browser, no manual `streamlit run` needed.
+4. Name it `slimDocs` - double-clicking it launches Streamlit in a new console window and opens the app in your browser, no manual `streamlit run` needed.
 
 ---
 
@@ -102,9 +102,9 @@ Edit this file to change the port the app runs on or to disable auto-reload when
 
 After extraction, three tabs are available for each processed file:
 
-- **📂 Original file** — in-app rendered view of the source file
-- **📄 Extracted text** — raw parsed content with token count
-- **📝 Output** — final formatted output (Markdown / plain text / JSON)
+- **📂 Original file** - in-app rendered view of the source file
+- **📄 Extracted text** - raw parsed content with token count
+- **📝 Output** - final formatted output (Markdown / plain text / JSON)
 
 ---
 
@@ -160,7 +160,7 @@ PDFs get full treatment:
 
 ## URL mode
 
-Paste one or more URLs — one per line or comma-separated. SlimDocs fetches the page and extracts its main content using **trafilatura**.
+Paste one or more URLs - one per line or comma-separated. SlimDocs fetches the page and extracts its main content using **trafilatura**.
 
 **Confluence support:** if the `ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` environment variables are set, Confluence page URLs are fetched via the REST API with authentication.
 
@@ -204,7 +204,7 @@ The **Logs** tab shows a full session history of all extraction runs, filterable
 | `pandas` | `>=2.1.0` | DataFrames and CSV export |
 | `plotly` | `>=5.18.0` | Interactive charts in the Statistics tab |
 
-> Versions above match [`requirements.txt`](requirements.txt) — that file is the source of truth if the two ever drift.
+> Versions above match [`requirements.txt`](requirements.txt) - that file is the source of truth if the two ever drift.
 
 ---
 
@@ -212,11 +212,11 @@ The **Logs** tab shows a full session history of all extraction runs, filterable
 
 ### OCR not working / "Tesseract binary not found" in output
 
-**Symptom:** Extracted `.md` files contain lines like `OCR unavailable — Tesseract binary not found` or `OCR skipped — Tesseract not installed`.
+**Symptom:** Extracted `.md` files contain lines like `OCR unavailable - Tesseract binary not found` or `OCR skipped - Tesseract not installed`.
 
 **Cause:** `pytesseract` (the Python wrapper) and **Tesseract-OCR** (the actual OCR engine binary) are two separate installs. Having only `pytesseract` via pip is not enough.
 
-**Fix:** Follow the Tesseract install steps in [Getting started → Step 2](#2-install-tesseract-for-image-and-pdf-image-ocr) above. After adding Tesseract to PATH, **close and reopen the tool completely** — a page refresh alone does not reload environment variables.
+**Fix:** Follow the Tesseract install steps in [Getting started → Step 2](#2-install-tesseract-for-image-and-pdf-image-ocr) above. After adding Tesseract to PATH, **close and reopen the tool completely** - a page refresh alone does not reload environment variables.
 
 ### App doesn't open automatically in the browser
 
