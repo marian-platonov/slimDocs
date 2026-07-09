@@ -21,8 +21,7 @@ SlimDocs is a Streamlit web app that strips away binary file formats and gives y
 ### 1. Install Python dependencies
 
 ```bash
-pip install streamlit pandas plotly pdfplumber PyMuPDF python-docx openpyxl odfpy \
-            python-pptx pillow pytesseract trafilatura rarfile py7zr evtx requests
+pip install -r requirements.txt
 ```
 
 ### 2. Install Tesseract (for image and PDF image OCR)
