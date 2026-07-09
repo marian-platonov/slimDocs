@@ -193,6 +193,7 @@ The **Logs** tab shows a full session history of all extraction runs, filterable
 
 | Package | Version | Purpose |
 |---------|---------|---------|
+| `streamlit` | `>=1.38.0` | Python framework for the interactive app |
 | `pdfplumber` | `>=0.10.0` | PDF text and table extraction |
 | `PyMuPDF` | `>=1.24.0` | PDF page rendering and embedded image extraction |
 | `python-docx` | `>=1.1.0` | DOCX and ODT parsing |
