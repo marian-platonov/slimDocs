@@ -862,12 +862,12 @@ def extract_from_file(path: Path) -> str:
 
 def _fetch_confluence(url: str) -> str:
     import requests
-    match = re.search(r"/pages/(\d+)/", url)
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    match = re.search(r"/pages/(\d+)(?:/|$)", parsed.path)
     if not match:
         raise ValueError(f"Cannot extract Confluence page ID from: {url}")
     page_id = match.group(1)
-    from urllib.parse import urlparse
-    parsed = urlparse(url)
     api_url = (
         f"{parsed.scheme}://{parsed.netloc}"
         f"/wiki/rest/api/content/{page_id}?expand=body.view"
