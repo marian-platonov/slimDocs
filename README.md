@@ -10,7 +10,7 @@ SlimDocs is a Streamlit web app that strips away binary file formats and gives y
 
 - Supports 50+ file extensions across documents, spreadsheets, archives, images, logs, code, and more
 - Extracts embedded images from PDFs and saves them alongside the output with OCR text where available
-- Fetches and extracts content directly from URLs, including Confluence pages
+- Fetches and extracts content directly from URLs, including Confluence and Salesforce pages
 - Outputs Markdown, plain text, or chunked JSON ready for Claude or any other LLM
 - Shows token counts before and after, reduction percentage, and per-file statistics
 
@@ -168,6 +168,8 @@ PDFs get full treatment:
 
 Paste one or more URLs - one per line or comma-separated. SlimDocs fetches the page and extracts its main content using **trafilatura**.
 
+> **Note:** trafilatura parses static HTML only - it doesn't execute JavaScript. A URL that renders entirely client-side (a React/Angular/Vue single-page app with no server-rendered content) will only ever expose its `<noscript>` fallback. SlimDocs detects the common "JavaScript is required" / "please enable JavaScript" placeholder text and reports it as an extraction error rather than silently "succeeding" with junk content.
+
 **Confluence support:** if the `ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` environment variables are set, Confluence page URLs are fetched via the REST API with authentication.
 
 ```bash
@@ -175,17 +177,51 @@ set ATLASSIAN_EMAIL=you@company.com
 set ATLASSIAN_API_TOKEN=your_token_here
 ```
 
+**Salesforce support:** Salesforce URLs (`*.salesforce.com` / `*.lightning.force.com`) are fetched via the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`) instead of a plain HTTP request. A plain request only ever returns Salesforce's login page (there's no browser session to reuse), so SlimDocs shells out to the `sf` CLI's already-authenticated org instead.
+
+**Setup - one-time, per machine:**
+
+1. **Install the CLI** (requires [Node.js](https://nodejs.org/)):
+   ```bash
+   npm install --global @salesforce/cli
+   ```
+   Verify it's on PATH:
+   ```bash
+   sf --version
+   ```
+2. **Authenticate to your org** - this opens a browser window for the standard Salesforce login/SSO flow, then stores the session under the alias you choose:
+   ```bash
+   sf org login web -a UiPath --set-default
+   ```
+   - `-a UiPath` names this org alias `UiPath` (pick any name)
+   - `--set-default` makes it the CLI's default org, so SlimDocs doesn't need to know the alias
+3. **Verify the session:**
+   ```bash
+   sf org display
+   ```
+   Should print `connectedStatus: Connected` and the org's instance URL. Re-run `sf org login web` any time the session expires.
+
+If the CLI isn't installed, or there's no authenticated default org, SlimDocs shows an actionable error naming exactly which step above is missing - it won't silently fail or show a login-page scrape.
+
+**Supported URL shapes:**
+- A single record, e.g. `.../lightning/r/Case/500XXXXXXXXXXXXAAA/view` - fetched as a Markdown field list.
+- A bare classic record ID, e.g. `https://yourorg.my.salesforce.com/500XXXXXXXXXXXXAAA` - object type is resolved automatically.
+- A **custom** saved list view, e.g. `.../lightning/o/Case/list?filterName=My_Open_Cases` - fetched as a Markdown table (up to 2,000 rows). Built-in standard views (e.g. "Recent", "All Open Cases") aren't queryable this way - open a custom list view, or paste a single record URL instead.
+
 ---
 
 ## Statistics & Reports
 
-The **Statistics & Reports** tab shows:
+The **Statistics & Reports** tab shows, for the run currently being viewed:
 
-- Total tokens before and after across all processed files
-- Per-file reduction breakdown (bar chart)
-- Exportable extraction report (Markdown)
+- Total tokens before and after, per-file reduction breakdown (bar chart), and tokens-saved-by-file-type (pie chart)
+- A full results table for successfully extracted files
+- An **Errors** table with the file/URL and error message for anything that failed in that run - shown even for a run that produced only errors and no successes
+- An exportable extraction report (Markdown) and a running **Session Total** across every run so far, once you've done more than one
 
-The **Logs** tab shows a full session history of all extraction runs, filterable by success / error and searchable by filename.
+By default this shows the **latest** run. To go back and re-examine an older one, use the Logs tab below.
+
+The **Logs** tab shows a full history of every extraction run, filterable by success / error and searchable by filename. Every run's full results stay available for the life of the browser session (not just the summary line in Logs) - **click any log row** to jump straight to that run's report in Statistics & Reports, with a banner showing which session you're viewing and a **⬅️ Back to latest** button to return.
 
 ---
 

@@ -1,4 +1,4 @@
-"""SlimDocs — Extract and reformat file content for AI workflows."""
+"""SlimDocs - Extract and reformat file content for AI workflows."""
 
 import io
 import json
@@ -13,8 +13,9 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
-# ── wevtapi.dll — Windows-native EVTX parser (superior to evtx library) ──────
+# ── wevtapi.dll - Windows-native EVTX parser (superior to evtx library) ──────
 # Loaded once at startup; None on non-Windows or if the DLL is unavailable.
 import ctypes
 import sys as _sys
@@ -171,10 +172,10 @@ _PLAINTEXT_EXTS = (
 )
 
 _FORMAT_OPTIONS = {
-    "md — Markdown": "md",
-    "txt — Plain text": "txt",
-    "json — Chunked Claude-ready JSON": "json",
-    "duckdb — DuckDB database": "duckdb",
+    "md - Markdown": "md",
+    "txt - Plain text": "txt",
+    "json - Chunked Claude-ready JSON": "json",
+    "duckdb - DuckDB database": "duckdb",
 }
 
 _DOWNLOADS_DIR = Path.home() / "Downloads"
@@ -196,6 +197,9 @@ def _init_session():
         "processing": False,
         "content_map": {},
         "logs": [],
+        "session_history": {},
+        "selected_session_ts": None,
+        "nav_to_stats_pending": False,
         "session_totals": {
             "runs": 0, "files_ok": 0, "errors": 0,
             "tokens_before": 0, "tokens_after": 0, "tokens_saved": 0,
@@ -245,7 +249,7 @@ def _extract_pdf(path: Path) -> str:
     try:
         import pdfplumber
     except ImportError:
-        raise RuntimeError("pdfplumber not installed — run: pip install pdfplumber")
+        raise RuntimeError("pdfplumber not installed - run: pip install pdfplumber")
 
     pages_out = []
     with pdfplumber.open(path) as pdf:
@@ -276,7 +280,7 @@ def _extract_pdf(path: Path) -> str:
             # ── Note embedded images/charts ───────────────────────────────
             if page.images:
                 parts.append(
-                    f"*[{len(page.images)} image/chart object(s) on this page — "
+                    f"*[{len(page.images)} image/chart object(s) on this page - "
                     f"see Embedded Image OCR section below]*"
                 )
 
@@ -359,7 +363,7 @@ def _extract_pdf_images_ocr(path: Path) -> str:
                 _pdf_img_cache[cache_key].append((rel_name, raw_bytes))
 
                 header = (
-                    f"### Embedded image — page {page_num}, "
+                    f"### Embedded image - page {page_num}, "
                     f"#{img_counter} ({img.width}×{img.height} px)\n"
                     f"![image]({rel_name})"
                 )
@@ -369,11 +373,11 @@ def _extract_pdf_images_ocr(path: Path) -> str:
                     if not tesseract_missing_reported:
                         tesseract_missing_reported = True
                         page_parts.append(
-                            "**OCR unavailable** — Tesseract binary not found.  \n"
+                            "**OCR unavailable** - Tesseract binary not found.  \n"
                             "Install from https://github.com/UB-Mannheim/tesseract/wiki "
                             "and add its directory to your PATH, then re-run extraction."
                         )
-                    page_parts.append(f"{header}  \n*[OCR skipped — Tesseract not installed]*")
+                    page_parts.append(f"{header}  \n*[OCR skipped - Tesseract not installed]*")
                 elif ocr_text:
                     page_parts.append(f"{header}  \n**OCR text:**\n{ocr_text}")
                 else:
@@ -390,7 +394,7 @@ def _extract_docx(path: Path) -> str:
     try:
         from docx import Document
     except ImportError:
-        raise RuntimeError("python-docx not installed — run: pip install python-docx")
+        raise RuntimeError("python-docx not installed - run: pip install python-docx")
     doc = Document(path)
     lines = []
     for para in doc.paragraphs:
@@ -401,11 +405,11 @@ def _extract_docx(path: Path) -> str:
 
 
 def _extract_odt(path: Path) -> str:
-    """OpenDocument Text — extract content.xml from the ZIP container."""
+    """OpenDocument Text - extract content.xml from the ZIP container."""
     try:
         from defusedxml import ElementTree as DET
     except ImportError:
-        raise RuntimeError("defusedxml not installed — run: pip install defusedxml")
+        raise RuntimeError("defusedxml not installed - run: pip install defusedxml")
     with zipfile.ZipFile(path, "r") as zf:
         if "content.xml" not in zf.namelist():
             raise ValueError("content.xml not found inside ODT file")
@@ -436,7 +440,7 @@ def _extract_xlsx(path: Path) -> str:
     try:
         import openpyxl
     except ImportError:
-        raise RuntimeError("openpyxl not installed — run: pip install openpyxl")
+        raise RuntimeError("openpyxl not installed - run: pip install openpyxl")
     wb = openpyxl.load_workbook(path, data_only=True)
     sections = []
     for name in wb.sheetnames:
@@ -456,7 +460,7 @@ def _extract_ods(path: Path) -> str:
         return df.to_string(index=False)
     except Exception as e:
         if "odf" in str(e).lower() or "odfpy" in str(e).lower():
-            raise RuntimeError("odfpy not installed — run: pip install odfpy")
+            raise RuntimeError("odfpy not installed - run: pip install odfpy")
         raise
 
 
@@ -464,7 +468,7 @@ def _extract_pptx(path: Path) -> str:
     try:
         from pptx import Presentation
     except ImportError:
-        raise RuntimeError("python-pptx not installed — run: pip install python-pptx")
+        raise RuntimeError("python-pptx not installed - run: pip install python-pptx")
     prs = Presentation(path)
     slides = []
     for i, slide in enumerate(prs.slides, 1):
@@ -486,7 +490,7 @@ def _extract_image(path: Path) -> str:
         import pytesseract
     except ImportError:
         raise RuntimeError(
-            "pillow/pytesseract not installed — run: pip install pillow pytesseract\n"
+            "pillow/pytesseract not installed - run: pip install pillow pytesseract\n"
             "Also install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki"
         )
     with Image.open(path) as img:
@@ -524,7 +528,7 @@ def _extract_html(path: Path) -> str:
     try:
         import trafilatura
     except ImportError:
-        raise RuntimeError("trafilatura not installed — run: pip install trafilatura")
+        raise RuntimeError("trafilatura not installed - run: pip install trafilatura")
     html = _decode_bytes(path.read_bytes())
     result = trafilatura.extract(
         html, output_format="markdown",
@@ -580,7 +584,7 @@ def _extract_archive(path: Path) -> str:
             else:
                 _skipped_count += 1
         else:
-            _skipped_count += 1  # nested archive — skip to avoid recursion
+            _skipped_count += 1  # nested archive - skip to avoid recursion
 
     if ext == ".zip":
         with zipfile.ZipFile(path, "r") as zf:
@@ -610,7 +614,7 @@ def _extract_archive(path: Path) -> str:
         try:
             import rarfile
         except ImportError:
-            raise RuntimeError("rarfile not installed — run: pip install rarfile")
+            raise RuntimeError("rarfile not installed - run: pip install rarfile")
         with rarfile.RarFile(path, "r") as rf:
             for info in rf.infolist():
                 tag = "[DIR] " if info.isdir() else "[FILE]"
@@ -625,7 +629,7 @@ def _extract_archive(path: Path) -> str:
         try:
             import py7zr
         except ImportError:
-            raise RuntimeError("py7zr not installed — run: pip install py7zr")
+            raise RuntimeError("py7zr not installed - run: pip install py7zr")
         with py7zr.SevenZipFile(path, mode="r") as sz:
             all_files = sz.getnames()
             for name in all_files:
@@ -664,7 +668,7 @@ def _evtx_parse_xml(xml_str: str, msg: str = "") -> str | None:
     try:
         from defusedxml import ElementTree as DET
     except ImportError:
-        raise RuntimeError("defusedxml not installed — run: pip install defusedxml")
+        raise RuntimeError("defusedxml not installed - run: pip install defusedxml")
     _NS = "http://schemas.microsoft.com/win/2004/08/events/event"
     _LEVELS = {
         "0": "Info", "1": "Critical", "2": "Error",
@@ -723,9 +727,9 @@ def _extract_evtx(path: Path) -> str:
     Windows Event Log (.evtx) extraction.
 
     Strategy (in order):
-      1. wevtapi.dll (Windows-native) — includes EvtFormatMessage human-readable
+      1. wevtapi.dll (Windows-native) - includes EvtFormatMessage human-readable
          descriptions, the richest output possible.
-      2. evtx Python library — cross-platform fallback.
+      2. evtx Python library - cross-platform fallback.
     """
     _LEVELS = {
         "0": "Info", "1": "Critical", "2": "Error",
@@ -750,7 +754,7 @@ def _extract_evtx(path: Path) -> str:
                 except (ET.ParseError, Exception):
                     parse_errors += 1
         except OSError as e:
-            # wevtapi failed (e.g. file locked, corrupt) — fall through to evtx
+            # wevtapi failed (e.g. file locked, corrupt) - fall through to evtx
             lines = []
             level_counts = {}
             parse_errors = 0
@@ -761,7 +765,7 @@ def _extract_evtx(path: Path) -> str:
             from evtx import PyEvtxParser
         except ImportError:
             raise RuntimeError(
-                "evtx library not installed — run: pip install evtx\n"
+                "evtx library not installed - run: pip install evtx\n"
                 "(wevtapi.dll is also unavailable on this system)"
             )
         try:
@@ -811,7 +815,7 @@ def _extract_video(path: Path) -> str:
         f"Video file: {path.name}\n"
         f"Format: {path.suffix.upper().lstrip('.')}\n"
         f"File size: {size_mb:.2f} MB\n"
-        "(Content extraction not supported for video — file metadata only.)"
+        "(Content extraction not supported for video - file metadata only.)"
     )
 
 
@@ -878,21 +882,230 @@ def _fetch_confluence(url: str) -> str:
     return resp.json()["body"]["view"]["value"]
 
 
+def _sf_auth_error(message: str) -> RuntimeError:
+    return RuntimeError(
+        "Salesforce CLI has no authenticated default org.\n"
+        f"Details: {message}\n"
+        "Authenticate first: sf org login web --alias myorg --set-default"
+    )
+
+
+def _sf_is_auth_error(message: str) -> bool:
+    return bool(re.search(
+        r"no.*(default org|authorization|access token)|NamedOrgNotFound|NotAuthenticated|expired",
+        message, re.I,
+    ))
+
+
+def _sf_lookup_sobject_by_prefix(sf_bin: str, record_id: str) -> str:
+    """Resolve a bare record ID's object type via its 3-char key prefix."""
+    import subprocess
+    lookup = subprocess.run(
+        [sf_bin, "data", "query", "--query",
+         f"SELECT QualifiedApiName FROM EntityDefinition WHERE KeyPrefix = '{record_id[:3]}'",
+         "--use-tooling-api", "--json"],
+        capture_output=True, text=True, timeout=30,
+    )
+    lookup_data = json.loads(lookup.stdout or "{}")
+    records = lookup_data.get("result", {}).get("records", [])
+    if lookup.returncode != 0 or not records:
+        raise ValueError(
+            f"Could not determine the Salesforce object type for ID '{record_id}'. "
+            "Use a full Lightning record URL "
+            "(https://<domain>.lightning.force.com/lightning/r/<Object>/<Id>/view) instead."
+        )
+    return records[0]["QualifiedApiName"]
+
+
+def _sf_fetch_record(sf_bin: str, sobject: str, record_id: str) -> tuple:
+    """Fetch a single record's fields via `sf data get record`, formatted as Markdown."""
+    import subprocess
+    proc = subprocess.run(
+        [sf_bin, "data", "get", "record", "--sobject", sobject,
+         "--record-id", record_id, "--json"],
+        capture_output=True, text=True, timeout=30,
+    )
+    data = json.loads(proc.stdout or "{}")
+    if proc.returncode != 0 or data.get("status") != 0:
+        message = data.get("message") or proc.stderr.strip() or "Unknown error"
+        if _sf_is_auth_error(message):
+            raise _sf_auth_error(message)
+        raise RuntimeError(f"Salesforce CLI error fetching {sobject} {record_id}: {message}")
+
+    fields = data.get("result", {})
+    lines = [f"# Salesforce {sobject} - {record_id}", ""]
+    for key, value in fields.items():
+        if key == "attributes" or isinstance(value, (dict, list)) or value in (None, ""):
+            continue
+        lines.append(f"- **{key}**: {value}")
+    return "\n".join(lines), f"{sobject}_{record_id}"
+
+
+def _sf_md_cell(value) -> str:
+    text = "" if value is None else str(value)
+    return text.replace("\n", " ").replace("\r", " ").replace("|", "\\|")
+
+
+def _sf_fetch_list_view(sf_bin: str, sobject: str, filter_name: str) -> tuple:
+    """Fetch a saved list view's rows via the REST API, formatted as a Markdown table."""
+    import subprocess
+    # Salesforce DeveloperName/Id values are always alphanumeric + underscore; reject
+    # anything else outright rather than trying to escape it into the SOQL literal.
+    if not re.fullmatch(r"[A-Za-z0-9_]{1,80}", filter_name):
+        raise ValueError(
+            f"Invalid Salesforce list view filter name: '{filter_name}'. Expected only "
+            "letters, numbers, and underscores."
+        )
+    # Salesforce rejects the whole query if `Id = '...'` doesn't look like an ID literal,
+    # so only add that clause when filter_name is actually ID-shaped.
+    if re.fullmatch(r"[a-zA-Z0-9]{15}|[a-zA-Z0-9]{18}", filter_name):
+        where_clause = f"(DeveloperName = '{filter_name}' OR Id = '{filter_name}')"
+    else:
+        where_clause = f"DeveloperName = '{filter_name}'"
+    lookup = subprocess.run(
+        [sf_bin, "data", "query", "--query",
+         f"SELECT Id, Name FROM ListView WHERE SobjectType = '{sobject}' AND {where_clause}",
+         "--json"],
+        capture_output=True, text=True, timeout=30,
+    )
+    lookup_data = json.loads(lookup.stdout or "{}")
+    lv_records = lookup_data.get("result", {}).get("records", [])
+    if lookup.returncode != 0 or not lv_records:
+        raise ValueError(
+            f"Could not find a saved list view '{filter_name}' on {sobject}. "
+            "Standard/system list views (e.g. \"Recent\", \"All Open Cases\") aren't "
+            "queryable this way - open a custom list view instead, or use a single "
+            "record URL."
+        )
+    list_view_id = lv_records[0]["Id"]
+    list_view_label = lv_records[0].get("Name", filter_name)
+
+    org_info = subprocess.run(
+        [sf_bin, "org", "display", "--json"], capture_output=True, text=True, timeout=30,
+    )
+    try:
+        api_version = json.loads(org_info.stdout or "{}")["result"]["apiVersion"]
+    except (json.JSONDecodeError, KeyError):
+        api_version = "60.0"
+
+    proc = subprocess.run(
+        [sf_bin, "api", "request", "rest",
+         f"services/data/v{api_version}/sobjects/{sobject}/listviews/{list_view_id}/results?pageSize=2000"],
+        capture_output=True, text=True, timeout=60,
+    )
+    try:
+        results = json.loads(proc.stdout or "null")
+    except json.JSONDecodeError:
+        results = None
+
+    if proc.returncode != 0:
+        message = proc.stderr.strip() or "Unknown error"
+        if isinstance(results, list) and results:
+            message = results[0].get("message", message)
+        elif isinstance(results, dict):
+            message = results.get("message", message)
+        if _sf_is_auth_error(message):
+            raise _sf_auth_error(message)
+        raise RuntimeError(f"Salesforce CLI error fetching list view '{filter_name}': {message}")
+    if results is None:
+        raise RuntimeError(
+            f"Salesforce CLI returned an unparseable response for list view '{filter_name}'."
+        )
+
+    columns = [_sf_md_cell(c.get("label", "")) for c in results.get("columns", [])]
+    records = results.get("records", [])
+    total = results.get("size", len(records))
+
+    lines = [f"# Salesforce {sobject} list view - {list_view_label}", ""]
+    lines.append(
+        f"*Showing {len(records)} of {total} records (truncated).*\n"
+        if total > len(records) else f"*{len(records)} record(s).*\n"
+    )
+    lines.append("| " + " | ".join(columns) + " |")
+    lines.append("|" + "|".join(["---"] * len(columns)) + "|")
+    for rec in records:
+        values = [_sf_md_cell(col.get("value")) for col in rec.get("columns", [])]
+        lines.append("| " + " | ".join(values) + " |")
+
+    return "\n".join(lines), f"{sobject}_listview_{filter_name}"
+
+
+def _fetch_salesforce(url: str) -> tuple:
+    """Fetch a Salesforce record or list view via the authenticated `sf` CLI, as Markdown.
+
+    A plain HTTP GET only returns Salesforce's login page (no session cookie),
+    so content goes through the Salesforce CLI's already-authenticated default
+    org instead of the requests/trafilatura path used for other URLs.
+    """
+    import shutil
+    from urllib.parse import urlparse, parse_qs
+
+    sf_bin = shutil.which("sf")
+    if not sf_bin:
+        raise RuntimeError(
+            "Salesforce CLI ('sf') not found on PATH - Salesforce URLs need an "
+            "authenticated CLI session because a plain HTTP request only returns the "
+            "login page.\n"
+            "Install: npm install --global @salesforce/cli\n"
+            "Then authenticate once: sf org login web --alias myorg --set-default"
+        )
+
+    parsed = urlparse(url)
+    path = parsed.path
+
+    m = re.search(r"/lightning/r/([A-Za-z0-9_]+)/([a-zA-Z0-9]{15,18})(?:/|$)", path)
+    if m:
+        sobject, record_id = m.group(1), m.group(2)
+        return _sf_fetch_record(sf_bin, sobject, record_id)
+
+    m = re.fullmatch(r"/?([a-zA-Z0-9]{15}|[a-zA-Z0-9]{18})/?", path)
+    if m:
+        record_id = m.group(1)
+        sobject = _sf_lookup_sobject_by_prefix(sf_bin, record_id)
+        return _sf_fetch_record(sf_bin, sobject, record_id)
+
+    m = re.search(r"/lightning/o/([A-Za-z0-9_]+)/list", path)
+    if m:
+        sobject = m.group(1)
+        filter_name = parse_qs(parsed.query).get("filterName", [None])[0]
+        if not filter_name:
+            raise ValueError(
+                "This Salesforce list view URL doesn't specify a filterName, so SlimDocs "
+                "can't tell which saved list view to fetch. Open a specific list view "
+                "(URL contains '?filterName=...') or paste a single record URL instead."
+            )
+        return _sf_fetch_list_view(sf_bin, sobject, filter_name)
+
+    raise ValueError(f"Could not find a Salesforce record ID or list view in URL: {url}")
+
+
+_JS_REQUIRED_RE = re.compile(
+    r"you (need|must) (to )?enable javascript|javascript is required|"
+    r"please enable javascript|this (app|page|site) requires javascript|"
+    r"enable javascript to (run|view|continue)",
+    re.IGNORECASE,
+)
+
+
 def _fetch_url(url: str, fmt: str) -> tuple:
     """Fetch a URL and return (extracted_text, source_name, raw_html_bytes)."""
     from urllib.parse import urlparse, unquote
     try:
         import requests
     except ImportError:
-        raise RuntimeError("requests not installed — run: pip install requests")
+        raise RuntimeError("requests not installed - run: pip install requests")
     try:
         import trafilatura
     except ImportError:
-        raise RuntimeError("trafilatura not installed — run: pip install trafilatura")
+        raise RuntimeError("trafilatura not installed - run: pip install trafilatura")
 
     parsed = urlparse(url)
     path_stem = Path(unquote(parsed.path)).stem or Path(unquote(parsed.path)).parent.name or "page"
     source_name = re.sub(r"[^\w\-]", "_", f"{parsed.netloc}_{path_stem}")[:80].strip("_")
+
+    if "salesforce.com" in parsed.netloc or "force.com" in parsed.netloc:
+        content, sf_source = _fetch_salesforce(url)
+        return content, sf_source, len(content.encode("utf-8"))
 
     if "atlassian.net" in parsed.netloc and "/pages/" in parsed.path:
         html = _fetch_confluence(url)
@@ -914,6 +1127,13 @@ def _fetch_url(url: str, fmt: str) -> tuple:
     )
     if not content or not content.strip():
         raise ValueError("No content could be extracted from this URL")
+    if len(content.strip()) < 300 and _JS_REQUIRED_RE.search(content):
+        raise ValueError(
+            "This page appears to be a JavaScript-rendered single-page app - only a "
+            "'JavaScript is required' placeholder was found. SlimDocs fetches static "
+            "HTML only and can't execute JavaScript, so this page's real content can't "
+            "be extracted this way."
+        )
     return content, source_name, raw_html_bytes
 
 
@@ -933,7 +1153,7 @@ def _make_duckdb_db(output_dir: Path) -> tuple:
     try:
         import duckdb
     except ImportError:
-        raise RuntimeError("duckdb not installed — run: pip install duckdb")
+        raise RuntimeError("duckdb not installed - run: pip install duckdb")
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     db_path = output_dir / f"slimDocs_{ts}.duckdb"
     conn = duckdb.connect(str(db_path))
@@ -1480,7 +1700,7 @@ def _render_pptx_preview(path: Path):
         return
 
     prs        = Presentation(path)
-    all_slides = list(prs.slides)   # materialise — prs.slides doesn't support slicing
+    all_slides = list(prs.slides)   # materialise - prs.slides doesn't support slicing
     total      = len(all_slides)
     _MAX_SLIDES = 50
     shown = min(total, _MAX_SLIDES)
@@ -1493,7 +1713,7 @@ def _render_pptx_preview(path: Path):
         # Build the expander label from the slide title (if available)
         title_shape = slide.shapes.title
         title_text  = title_shape.text.strip() if title_shape and title_shape.text.strip() else ""
-        label = f"Slide {slide_num}" + (f" — {title_text}" if title_text else "")
+        label = f"Slide {slide_num}" + (f" - {title_text}" if title_text else "")
 
         with st.expander(label, expanded=(slide_num == 1)):
             if title_text:
@@ -1568,7 +1788,7 @@ def _render_pptx_preview(path: Path):
 
 def _render_original_file(path_str: str):
     """Render a best-effort in-app view of the source file."""
-    # URLs — nothing to render locally
+    # URLs - nothing to render locally
     if path_str.startswith("http://") or path_str.startswith("https://"):
         st.info(f"Source is a URL: {path_str}")
         return
@@ -1585,7 +1805,7 @@ def _render_original_file(path_str: str):
         st.image(str(path), use_container_width=True)
         return
 
-    # ── PDF — render each page as an image via PyMuPDF ───────────────────
+    # ── PDF - render each page as an image via PyMuPDF ───────────────────
     if ext == ".pdf":
         try:
             import fitz
@@ -1652,7 +1872,7 @@ def _render_original_file(path_str: str):
         st.code(raw[:_PREVIEW_LIMIT] if trunc else raw, language=lang, wrap_lines=True)
         return
 
-    # ── EVTX — show parsed event records inline ───────────────────────────
+    # ── EVTX - show parsed event records inline ───────────────────────────
     if ext == ".evtx":
         entry = st.session_state.content_map.get(path_str, {})
         raw = entry.get("raw", "")
@@ -1665,7 +1885,7 @@ def _render_original_file(path_str: str):
             st.info("Run extraction to view parsed event log records here.")
         return
 
-    # ── Archives — file listing + extracted text ──────────────────────────
+    # ── Archives - file listing + extracted text ──────────────────────────
     if ext in _EXT_CATEGORIES["Archives"]:
         if ext == ".zip":
             try:
@@ -1710,31 +1930,31 @@ def _render_original_file(path_str: str):
         except Exception:
             st.info(
                 "Video preview unavailable.  \n"
-                "The Extracted text tab shows file metadata only — "
+                "The Extracted text tab shows file metadata only - "
                 "audio/video transcription is not supported."
             )
         return
 
-    # ── DOCX — formatted render ───────────────────────────────────────────
+    # ── DOCX - formatted render ───────────────────────────────────────────
     if ext in {".docx"}:
         _render_docx_preview(path)
         return
 
     if ext == ".doc":
         st.info(
-            "`.doc` is the legacy Word binary format — python-docx cannot open it.  \n"
+            "`.doc` is the legacy Word binary format - python-docx cannot open it.  \n"
             "Convert to `.docx` in Word, or see the **Extracted text** tab."
         )
         return
 
-    # ── PPTX — slide-by-slide render ─────────────────────────────────────
+    # ── PPTX - slide-by-slide render ─────────────────────────────────────
     if ext == ".pptx":
         _render_pptx_preview(path)
         return
 
     if ext == ".ppt":
         st.info(
-            "`.ppt` is the legacy PowerPoint binary format — python-pptx cannot open it.  \n"
+            "`.ppt` is the legacy PowerPoint binary format - python-pptx cannot open it.  \n"
             "Convert to `.pptx` in PowerPoint, or see the **Extracted text** tab."
         )
         return
@@ -1762,7 +1982,7 @@ def _show_preview(row: dict):
     lang     = lang_map.get(fmt_ext, "text")
 
     label = row.get("URL", row["File"]) if "URL" in row else row["File"]
-    st.markdown(f"**Preview — {label}**")
+    st.markdown(f"**Preview - {label}**")
 
     tab_orig, tab_raw, tab_fmt = st.tabs([
         "📂 Original file",
@@ -1785,7 +2005,7 @@ def _show_preview(row: dict):
 
 # ── Help dialog ───────────────────────────────────────────────────────────────
 
-@st.dialog("📄 SlimDocs — Help", width="large")
+@st.dialog("📄 SlimDocs - Help", width="large")
 def _show_help():
     st.markdown("""
 ## How to use
@@ -1850,14 +2070,14 @@ pip install duckdb              # DuckDB output format
 def _build_report(results: dict) -> str:
     successes = results["successes"]
     errors    = results["errors"]
-    run_ts    = results.get("run_ts", "—")
+    run_ts    = results.get("run_ts", "-")
     total_raw   = sum(r["Tokens Before"] for r in successes) if successes else 0
     total_out   = sum(r["Tokens After"]  for r in successes) if successes else 0
     total_saved = total_raw - total_out
     avg_red     = round((1 - total_out / max(total_raw, 1)) * 100, 1) if total_raw else 0.0
 
     lines = [
-        "# SlimDocs — Extraction Report",
+        "# SlimDocs - Extraction Report",
         f"\nGenerated: {run_ts}",
         "\n## Summary",
         f"- Files processed: {len(successes)}",
@@ -1882,6 +2102,45 @@ def _build_report(results: dict) -> str:
             name = Path(e["File"]).name if not e["File"].startswith("http") else e["File"][:60]
             lines.append(f"| {name} | {e['Error']} |")
     return "\n".join(lines)
+
+
+def _switch_to_tab(label_text: str) -> None:
+    """Click the Streamlit tab whose visible label contains ``label_text``.
+
+    Streamlit exposes no public API to change the active ``st.tabs`` panel from
+    Python, so this reaches into the parent document from the components
+    iframe and clicks the matching tab button. Depends on Streamlit's internal
+    tab markup (``button[data-baseweb="tab"]``) and may need updating if a
+    future Streamlit release changes it.
+    """
+    components.html(
+        f"""
+        <script>
+        (function() {{
+            const target = {json.dumps(label_text)};
+            function clickTab() {{
+                const doc = window.parent.document;
+                const tabs = doc.querySelectorAll('button[data-baseweb="tab"]');
+                for (const t of tabs) {{
+                    if (t.innerText.includes(target)) {{
+                        t.click();
+                        return true;
+                    }}
+                }}
+                return false;
+            }}
+            if (!clickTab()) {{
+                let attempts = 0;
+                const iv = setInterval(() => {{
+                    attempts++;
+                    if (clickTab() || attempts > 20) clearInterval(iv);
+                }}, 100);
+            }}
+        }})();
+        </script>
+        """,
+        height=0,
+    )
 
 
 # ── DuckDB Explorer helpers ───────────────────────────────────────────────────
@@ -1969,7 +2228,7 @@ def _render_duckdb_explorer(db_path: str):
     try:
         import duckdb as _duckdb
     except ImportError:
-        st.error("duckdb not installed — run: pip install duckdb")
+        st.error("duckdb not installed - run: pip install duckdb")
         return
 
     st.caption(f"Database: `{db_path}`")
@@ -2070,7 +2329,7 @@ def _render_duckdb_explorer(db_path: str):
                             shown     = snippets[:_MAX_SNIPPETS]
 
                             with st.expander(
-                                f"📄 {row['name']}  —  {n_matches:,} match(es)",
+                                f"📄 {row['name']}  -  {n_matches:,} match(es)",
                                 expanded=False,
                             ):
                                 for s in shown:
@@ -2305,7 +2564,7 @@ ORDER BY name;
                 status = (
                     f"Showing **{len(df):,}** of **{total_count:,}** rows"
                     + (" (filtered)" if filter_values else "")
-                    + (" — `content` truncated to 400 chars"
+                    + (" - `content` truncated to 400 chars"
                        if "content" in selected_cols else "")
                 )
                 st.caption(status)
@@ -2346,7 +2605,7 @@ def main():
         st.title("📄 SlimDocs")
         st.caption(
             "Extract text from any file or URL and reformat it as Markdown, "
-            "plain text, chunked Claude-ready JSON, or a queryable DuckDB database — "
+            "plain text, chunked Claude-ready JSON, or a queryable DuckDB database - "
             "with token reduction stats."
         )
     with help_col:
@@ -2478,7 +2737,7 @@ def main():
         tab4 = None
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # Tab 1 — File Processing
+    # Tab 1 - File Processing
     # ═══════════════════════════════════════════════════════════════════════════
     with tab1:
         if extract_clicked:
@@ -2582,6 +2841,8 @@ def main():
                             )
                         st.session_state.results = result
                         st.session_state.logs    = result["logs"] + st.session_state.logs
+                        st.session_state.session_history[result["run_ts"]] = result
+                        st.session_state.selected_session_ts = None
                         # Accumulate session-level totals
                         _suc = result["successes"]
                         _st  = st.session_state.session_totals
@@ -2604,9 +2865,9 @@ def main():
                     _n_err = len(_res.get("errors",   []))
                     with _sb_progress_slot.container():
                         if _n_err:
-                            st.warning(f"Done — {_n_ok} OK · {_n_err} error(s)")
+                            st.warning(f"Done - {_n_ok} OK · {_n_err} error(s)")
                         else:
-                            st.success(f"✅ Done — {_n_ok} file(s) extracted")
+                            st.success(f"✅ Done - {_n_ok} file(s) extracted")
 
         # ── Results display ────────────────────────────────────────────────
         results = st.session_state.results
@@ -2698,21 +2959,30 @@ def main():
 |---------|-------------|
 | **Single File** | Pick one file to extract |
 | **Folder** | Discover and extract all supported files in a directory tree |
-| **URLs** | Paste URLs (comma or newline-separated) — content fetched via trafilatura |
-| **md** | Clean Markdown — best for reading (default) |
-| **txt** | Plain text — maximum compatibility |
-| **json** | Chunked Claude-ready JSON — paste directly into API calls |
-| **duckdb** | DuckDB database file — enables full-text search, SQL editor, and table browser |
+| **URLs** | Paste URLs (comma or newline-separated) - content fetched via trafilatura |
+| **md** | Clean Markdown - best for reading (default) |
+| **txt** | Plain text - maximum compatibility |
+| **json** | Chunked Claude-ready JSON - paste directly into API calls |
+| **duckdb** | DuckDB database file - enables full-text search, SQL editor, and table browser |
 | **Zip output** | ON = single `.zip`; OFF = timestamped folder *(hidden for DuckDB)* |
 """)
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # Tab 2 — Statistics & Reports
+    # Tab 2 - Statistics & Reports
     # ═══════════════════════════════════════════════════════════════════════════
     with tab2:
-        results = st.session_state.results
-        if not results or not results["successes"]:
-            st.info("No extraction results yet — run File Processing first.")
+        _sel_ts = st.session_state.selected_session_ts
+        if _sel_ts and _sel_ts in st.session_state.session_history:
+            results = st.session_state.session_history[_sel_ts]
+            _bc1, _bc2 = st.columns([5, 1])
+            _bc1.info(f"📌 Viewing session from **{_sel_ts}** (opened from Logs).")
+            if _bc2.button("⬅️ Back to latest", use_container_width=True):
+                st.session_state.selected_session_ts = None
+                st.rerun()
+        else:
+            results = st.session_state.results
+        if not results or (not results["successes"] and not results["errors"]):
+            st.info("No extraction results yet - run File Processing first.")
         else:
             try:
                 import plotly.express as px
@@ -2736,7 +3006,7 @@ def main():
                            delta_color="inverse")
                 sc5.metric("Avg Reduction", f"{_savg}%")
                 st.divider()
-                st.subheader("Current Run")
+                st.subheader("Current Run" if not _sel_ts else "Selected Run")
 
             successes   = results["successes"]
             errors      = results["errors"]
@@ -2755,71 +3025,95 @@ def main():
 
             st.divider()
 
-            df_s = pd.DataFrame(successes)
+            if successes:
+                df_s = pd.DataFrame(successes)
 
-            if _has_plotly:
-                col_chart1, col_chart2 = st.columns(2)
+                if _has_plotly:
+                    col_chart1, col_chart2 = st.columns(2)
 
-                with col_chart1:
-                    st.subheader("Tokens Before vs After")
-                    chart_df = df_s[["File", "Tokens Before", "Tokens After"]].copy()
-                    chart_df["File"] = chart_df["File"].apply(
-                        lambda f: f if len(f) <= 30 else f[:27] + "…"
-                    )
-                    melted = chart_df.melt(
-                        id_vars="File",
-                        value_vars=["Tokens Before", "Tokens After"],
-                        var_name="Stage", value_name="Tokens",
-                    )
-                    fig1 = px.bar(
-                        melted, x="Tokens", y="File", color="Stage",
-                        barmode="group", orientation="h",
-                        color_discrete_map={
-                            "Tokens Before": "#94a3b8",
-                            "Tokens After":  "#22c55e",
-                        },
-                        height=max(300, len(successes) * 45),
-                    )
-                    fig1.update_layout(
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02),
-                        margin=dict(l=0, r=0, t=30, b=0),
-                        yaxis=dict(autorange="reversed"),
-                    )
-                    st.plotly_chart(fig1, use_container_width=True)
-
-                with col_chart2:
-                    st.subheader("Tokens Saved by File Type")
-                    df_s["Extension"] = df_s["_ext"]
-                    ext_df = df_s.groupby("Extension")["Saved"].sum().reset_index()
-                    ext_df = ext_df[ext_df["Saved"] > 0]
-                    if not ext_df.empty:
-                        fig2 = px.pie(
-                            ext_df, values="Saved", names="Extension", hole=0.35, height=350,
+                    with col_chart1:
+                        st.subheader("Tokens Before vs After")
+                        chart_df = df_s[["File", "Tokens Before", "Tokens After"]].copy()
+                        chart_df["File"] = chart_df["File"].apply(
+                            lambda f: f if len(f) <= 30 else f[:27] + "…"
                         )
-                        fig2.update_traces(textposition="inside", textinfo="percent+label")
-                        fig2.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-                        st.plotly_chart(fig2, use_container_width=True)
-                    else:
-                        st.info("No positive token savings to chart.")
+                        melted = chart_df.melt(
+                            id_vars="File",
+                            value_vars=["Tokens Before", "Tokens After"],
+                            var_name="Stage", value_name="Tokens",
+                        )
+                        fig1 = px.bar(
+                            melted, x="Tokens", y="File", color="Stage",
+                            barmode="group", orientation="h",
+                            color_discrete_map={
+                                "Tokens Before": "#94a3b8",
+                                "Tokens After":  "#22c55e",
+                            },
+                            height=max(300, len(successes) * 45),
+                        )
+                        fig1.update_layout(
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02),
+                            margin=dict(l=0, r=0, t=30, b=0),
+                            yaxis=dict(autorange="reversed"),
+                        )
+                        st.plotly_chart(fig1, use_container_width=True)
+
+                    with col_chart2:
+                        st.subheader("Tokens Saved by File Type")
+                        df_s["Extension"] = df_s["_ext"]
+                        ext_df = df_s.groupby("Extension")["Saved"].sum().reset_index()
+                        ext_df = ext_df[ext_df["Saved"] > 0]
+                        if not ext_df.empty:
+                            fig2 = px.pie(
+                                ext_df, values="Saved", names="Extension", hole=0.35, height=350,
+                            )
+                            fig2.update_traces(textposition="inside", textinfo="percent+label")
+                            fig2.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+                            st.plotly_chart(fig2, use_container_width=True)
+                        else:
+                            st.info("No positive token savings to chart.")
+                else:
+                    st.info("Install plotly (`pip install plotly`) to enable charts.")
+                    st.bar_chart(df_s.set_index("File")[["Tokens Before", "Tokens After"]])
+
+                st.divider()
+                st.subheader("Full Results Table")
+                _DCOLS = ["File", "Output", "Size (KB)", "Tokens Before", "Tokens After", "Saved", "Reduction %"]
+                st.dataframe(
+                    df_s[[c for c in _DCOLS if c in df_s.columns]],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Tokens Before": st.column_config.NumberColumn(format="%d"),
+                        "Tokens After":  st.column_config.NumberColumn(format="%d"),
+                        "Saved":         st.column_config.NumberColumn(format="%d"),
+                        "Reduction %":   st.column_config.NumberColumn(format="%.1f%%"),
+                        "Size (KB)":     st.column_config.NumberColumn(format="%.1f"),
+                    },
+                )
             else:
-                st.info("Install plotly (`pip install plotly`) to enable charts.")
-                st.bar_chart(df_s.set_index("File")[["Tokens Before", "Tokens After"]])
+                st.info("No successfully extracted files in this session.")
 
             st.divider()
-            st.subheader("Full Results Table")
-            _DCOLS = ["File", "Output", "Size (KB)", "Tokens Before", "Tokens After", "Saved", "Reduction %"]
-            st.dataframe(
-                df_s[[c for c in _DCOLS if c in df_s.columns]],
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Tokens Before": st.column_config.NumberColumn(format="%d"),
-                    "Tokens After":  st.column_config.NumberColumn(format="%d"),
-                    "Saved":         st.column_config.NumberColumn(format="%d"),
-                    "Reduction %":   st.column_config.NumberColumn(format="%.1f%%"),
-                    "Size (KB)":     st.column_config.NumberColumn(format="%.1f"),
-                },
-            )
+            st.subheader(f"Errors ({len(errors)})")
+            if errors:
+                df_e = pd.DataFrame(errors)
+                st.dataframe(
+                    df_e,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "File":  st.column_config.TextColumn("File",  width="medium"),
+                        "Error": st.column_config.TextColumn("Error", width="large"),
+                    },
+                )
+                csv_e = df_e.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "📥 Export errors as CSV", csv_e,
+                    "extraction_errors.csv", "text/csv",
+                )
+            else:
+                st.success("No errors in this session!")
 
             st.divider()
             st.subheader("Download Report")
@@ -2834,12 +3128,12 @@ def main():
             )
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # Tab 3 — Logs
+    # Tab 3 - Logs
     # ═══════════════════════════════════════════════════════════════════════════
     with tab3:
         logs = st.session_state.logs
         if not logs:
-            st.info("No logs yet — run File Processing first.")
+            st.info("No logs yet - run File Processing first.")
         else:
             col_type, col_search = st.columns([2, 4])
             with col_type:
@@ -2859,13 +3153,18 @@ def main():
                     if kw in e["File"].lower() or kw in e["Message"].lower()
                 ]
 
-            st.caption(f"Showing {len(filtered)} of {len(logs)} entries.")
+            st.caption(
+                f"Showing {len(filtered)} of {len(logs)} entries. "
+                "Click a row to open that session's report in Statistics & Reports."
+            )
             if filtered:
                 log_df = pd.DataFrame(filtered)
-                st.dataframe(
+                log_event = st.dataframe(
                     log_df,
                     use_container_width=True,
                     hide_index=True,
+                    on_select="rerun",
+                    selection_mode="single-row",
                     column_config={
                         "Time":    st.column_config.TextColumn("Time",    width="small"),
                         "Type":    st.column_config.TextColumn("Type",    width="small"),
@@ -2873,13 +3172,28 @@ def main():
                         "Message": st.column_config.TextColumn("Message", width="large"),
                     },
                 )
+                if log_event.selection.rows:
+                    _row = filtered[log_event.selection.rows[0]]
+                    _ts = _row["Time"]
+                    if _ts in st.session_state.session_history:
+                        if st.session_state.selected_session_ts != _ts:
+                            st.session_state.selected_session_ts = _ts
+                            st.session_state.nav_to_stats_pending = True
+                            st.rerun()
+                        elif st.session_state.get("nav_to_stats_pending"):
+                            st.session_state.nav_to_stats_pending = False
+                            st.toast(f"📊 Opened session {_ts} in Statistics & Reports")
+                            _switch_to_tab("Statistics & Reports")
+                    else:
+                        st.warning("That session's full data is no longer available.")
+
                 csv = log_df.to_csv(index=False).encode("utf-8")
                 st.download_button("📥 Export Logs", csv, "extraction_logs.csv", "text/csv")
             else:
                 st.info("No entries match the current filter.")
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # Tab 4 — DuckDB Explorer (only visible when DuckDB format is selected)
+    # Tab 4 - DuckDB Explorer (only visible when DuckDB format is selected)
     # ═══════════════════════════════════════════════════════════════════════════
     if tab4 is not None:
         with tab4:
