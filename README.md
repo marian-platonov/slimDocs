@@ -94,6 +94,8 @@ runOnSave = true
 
 Edit this file to change the port the app runs on or to disable auto-reload when `app.py` changes.
 
+For the full list of available `config.toml` options (server, browser, theme, client, logger, and more), see the official Streamlit reference: [docs.streamlit.io/develop/api-reference/configuration/config.toml](https://docs.streamlit.io/develop/api-reference/configuration/config.toml).
+
 ---
 
 ## How to use
