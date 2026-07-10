@@ -176,10 +176,20 @@ Paste one or more URLs - one per line or comma-separated. SlimDocs fetches the p
 
 **Confluence support:** if the `ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` environment variables are set, Confluence page URLs are fetched via the REST API with authentication.
 
-```bash
-set ATLASSIAN_EMAIL=you@company.com
-set ATLASSIAN_API_TOKEN=your_token_here
-```
+**Setup - one-time, per machine:**
+
+1. **Generate an API token** at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) - log in with the same Atlassian account you use to view Confluence, then create a token and copy it (it's only shown once).
+2. **Set the environment variables** - `ATLASSIAN_EMAIL` is the email address of that Atlassian account, `ATLASSIAN_API_TOKEN` is the token from step 1:
+   ```bash
+   set ATLASSIAN_EMAIL=you@company.com
+   set ATLASSIAN_API_TOKEN=your_token_here
+   ```
+   These only apply to processes started *after* they're set - close and reopen the terminal (and restart the SlimDocs app if it's already running) before testing.
+3. **Test it outside SlimDocs first**, against the actual Confluence page you want to fetch, so credential problems and app problems can't be confused:
+   ```cmd
+   curl -u "%ATLASSIAN_EMAIL%:%ATLASSIAN_API_TOKEN%" "https://uipath.atlassian.net/wiki/rest/api/content/87013232956?expand=body.view"
+   ```
+   (PowerShell: replace `%ATLASSIAN_EMAIL%:%ATLASSIAN_API_TOKEN%` with `` $env:ATLASSIAN_EMAIL`:$env:ATLASSIAN_API_TOKEN ``). A JSON response with the page's `body.view.value` means it works - swap in your own page's numeric ID from its URL. A `401`/`403` here means the credentials/permissions are the problem, not SlimDocs.
 
 **Salesforce support:** Salesforce URLs (`*.salesforce.com` / `*.lightning.force.com`) are fetched via the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`) instead of a plain HTTP request. A plain request only ever returns Salesforce's login page (there's no browser session to reuse), so SlimDocs shells out to the `sf` CLI's already-authenticated org instead.
 
