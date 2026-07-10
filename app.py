@@ -1085,6 +1085,11 @@ _JS_REQUIRED_RE = re.compile(
     r"enable javascript to (run|view|continue)",
     re.IGNORECASE,
 )
+_REDIRECT_STUB_RE = re.compile(
+    r"if you are not redirected|having trouble accessing|click here to continue",
+    re.IGNORECASE,
+)
+_META_REFRESH_RE = re.compile(r'<meta[^>]+http-equiv=["\']?refresh["\']?', re.IGNORECASE)
 
 
 def _fetch_url(url: str, fmt: str) -> tuple:
@@ -1127,13 +1132,22 @@ def _fetch_url(url: str, fmt: str) -> tuple:
     )
     if not content or not content.strip():
         raise ValueError("No content could be extracted from this URL")
-    if len(content.strip()) < 300 and _JS_REQUIRED_RE.search(content):
-        raise ValueError(
-            "This page appears to be a JavaScript-rendered single-page app - only a "
-            "'JavaScript is required' placeholder was found. SlimDocs fetches static "
-            "HTML only and can't execute JavaScript, so this page's real content can't "
-            "be extracted this way."
-        )
+    if len(content.strip()) < 300:
+        if _JS_REQUIRED_RE.search(content):
+            raise ValueError(
+                "This page appears to be a JavaScript-rendered single-page app - only a "
+                "'JavaScript is required' placeholder was found. SlimDocs fetches static "
+                "HTML only and can't execute JavaScript, so this page's real content can't "
+                "be extracted this way."
+            )
+        if _META_REFRESH_RE.search(html) or _REDIRECT_STUB_RE.search(content):
+            raise ValueError(
+                "This page is an automatic-redirect interstitial, not real content - only "
+                "redirect/placeholder text was found (e.g. 'click here if you are not "
+                "redirected'). SlimDocs fetches static HTML only and doesn't follow "
+                "client-side/JavaScript redirects, so it can't reach the actual "
+                "destination page this way."
+            )
     return content, source_name, raw_html_bytes
 
 

@@ -168,7 +168,9 @@ PDFs get full treatment:
 
 Paste one or more URLs - one per line or comma-separated. SlimDocs fetches the page and extracts its main content using **trafilatura**.
 
-> **Note:** trafilatura parses static HTML only - it doesn't execute JavaScript. A URL that renders entirely client-side (a React/Angular/Vue single-page app with no server-rendered content) will only ever expose its `<noscript>` fallback. SlimDocs detects the common "JavaScript is required" / "please enable JavaScript" placeholder text and reports it as an extraction error rather than silently "succeeding" with junk content.
+> **Note:** trafilatura parses static HTML only - it doesn't execute JavaScript and doesn't follow client-side redirects. Two kinds of URLs return placeholder text instead of real content, and SlimDocs detects both and reports them as extraction errors rather than silently "succeeding" with junk:
+> - A page that renders entirely client-side (a React/Angular/Vue single-page app with no server-rendered content) - only its `<noscript>` "JavaScript is required" fallback is visible.
+> - An automatic-redirect interstitial (e.g. Google Search's own "click here if you are not redirected" stub, or any `<meta http-equiv="refresh">` bounce page) - the real destination is never reached.
 
 **Confluence support:** if the `ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` environment variables are set, Confluence page URLs are fetched via the REST API with authentication.
 
