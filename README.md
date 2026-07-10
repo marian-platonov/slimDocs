@@ -18,7 +18,7 @@ SlimDocs is a Streamlit web app that strips away binary file formats and gives y
 
 ## Requirements
 
-Tested with **Python 3.14.6 (64-bit)** and **Streamlit 1.58.0**. Other 3.x/1.3x+ versions likely work but haven't been verified.
+Tested with **Python 3.14.6 (64-bit)** and **Streamlit 1.59.1**. Other 3.x/1.3x+ versions likely work but haven't been verified.
 
 ---
 
