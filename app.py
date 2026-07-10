@@ -2027,7 +2027,7 @@ def _show_help():
 | Step | Action |
 |------|--------|
 | **1. Input mode** | Single File, Folder, or URLs |
-| **2. Format** | `md` Markdown (default) · `txt` Plain text · `json` Chunked Claude JSON |
+| **2. Format** | `md` Markdown (default) · `txt` Plain text · `json` Chunked Claude JSON · `duckdb` Queryable database |
 | **3. Output dir** | Defaults to Downloads |
 | **4. Zip toggle** | ON = single `.zip`  OFF = timestamped folder  *(hidden for DuckDB)* |
 | **5. Extract** | Click 🚀 |
@@ -2053,14 +2053,26 @@ def _show_help():
 ## URL mode
 
 Paste one or more URLs (one per line or comma-separated).
-Confluence pages are fetched via the REST API if `ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` env vars are set.
+
+- **Confluence** pages are fetched via the REST API if `ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` env vars are set.
+- **Salesforce** record, bare-ID, and custom list-view URLs (`*.salesforce.com` / `*.lightning.force.com`) are fetched via the `sf` CLI, since a plain request only returns the login page. Requires the CLI installed (`npm install --global @salesforce/cli`) and an authenticated default org (`sf org login web -a UiPath --set-default`) - see the README for full setup steps.
+- **JavaScript-rendered / redirect-only pages** (SPA shells, "click here if you are not redirected" interstitials) are detected and reported as errors instead of silently extracting placeholder text - SlimDocs fetches static HTML only.
+
+---
+
+## Statistics & Reports and Logs
+
+- **Statistics & Reports** shows charts, a full results table, and an **Errors** table (even for runs that only errored) for the run currently being viewed, plus a running Session Total once you've done more than one run.
+- **Logs** keeps a full history of every extraction run. Click any log row to jump straight to that run's report in Statistics & Reports, with a **⬅️ Back to latest** button to return.
+- Choosing the **duckdb** output format unlocks a **DuckDB Explorer** tab: keyword search with highlighted snippets, a raw SQL editor, and a table browser - queried directly from the `.duckdb` file.
 
 ---
 
 ## Optional dependencies
 
 ```
-pip install pdfplumber          # PDF
+pip install pdfplumber          # PDF text/tables
+pip install PyMuPDF             # PDF embedded image extraction
 pip install python-docx         # DOCX / ODT
 pip install openpyxl            # XLSX
 pip install odfpy               # ODS
@@ -2070,8 +2082,9 @@ pip install trafilatura         # HTML / URL extraction
 pip install rarfile             # RAR archives
 pip install py7zr               # 7-Zip archives
 pip install evtx                # Windows Event Log
+pip install defusedxml          # Safe XML parsing (ODT / EVTX)
 pip install requests            # URL fetching
-pip install duckdb              # DuckDB output format
+pip install duckdb              # DuckDB output format + Explorer
 ```
 """)
     st.divider()
