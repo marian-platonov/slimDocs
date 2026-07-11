@@ -1,4 +1,6 @@
 .claude/
 __pycache__/
+CLAUDE.md
+demo-script-video.md
 *.pyc
 .venv/
