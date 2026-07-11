@@ -198,6 +198,7 @@ def _init_session():
         "logs": [],
         "session_history": {},
         "selected_session_ts": None,
+        "show_nav_hint": False,
         "session_totals": {
             "runs": 0, "files_ok": 0, "errors": 0,
             "tokens_before": 0, "tokens_after": 0, "tokens_saved": 0,
@@ -2109,7 +2110,7 @@ Paste one or more URLs (one per line or comma-separated).
 ## Statistics & Reports and Logs
 
 - **Statistics & Reports** shows charts, a full results table, and an **Errors** table (even for runs that only errored) for the run currently being viewed, plus a running Session Total once you've done more than one run.
-- **Logs** keeps a full history of every extraction run. Click any log row to jump straight to that run's report in Statistics & Reports, with a **⬅️ Back to latest** button to return.
+- **Logs** keeps a full history of every extraction run. Click a log row, then open **Statistics & Reports** yourself to see that run's report, with a **⬅️ Back to latest** button to return.
 - Choosing the **duckdb** output format unlocks a **DuckDB Explorer** tab: keyword search with highlighted snippets, a raw SQL editor, and a table browser - queried directly from the `.duckdb` file.
 
 ---
@@ -2178,13 +2179,14 @@ def _build_report(results: dict) -> str:
 
 
 def _on_logs_row_select() -> None:
-    """Widget callback for the Logs table: jump to that run's Statistics & Reports.
+    """Widget callback for the Logs table: load that run's data for Statistics & Reports.
 
-    Runs before the script body re-executes (Streamlit widget-callback
-    semantics), so setting ``session_state["main_tabs"]`` here - before
-    ``st.tabs(..., key="main_tabs")`` is re-instantiated - is what actually
-    switches the active tab. ``st.tabs`` has no other public API for
-    controlling the active tab from Python.
+    ``st.tabs`` has no reliable way to switch the active tab from Python -
+    its state-tracking mode (``on_change="rerun"``) reruns the app on every
+    tab switch, which both interrupted in-progress extractions and, in
+    practice, occasionally reset the active tab on unrelated reruns. So this
+    only loads the session's data; the user still clicks the Statistics &
+    Reports tab themselves, prompted by the one-shot hint set below.
     """
     sel = st.session_state.get("logs_table")
     if not sel or not sel["selection"]["rows"]:
@@ -2209,8 +2211,8 @@ def _on_logs_row_select() -> None:
     ts = filtered[idx]["Time"]
     if ts in st.session_state.session_history:
         st.session_state.selected_session_ts = ts
-        st.session_state["main_tabs"] = "📊 Statistics & Reports"
-        st.toast(f"📊 Opened session {ts} in Statistics & Reports")
+        st.session_state.show_nav_hint = True
+        st.toast(f"📊 Session {ts} loaded - open the Statistics & Reports tab to view it")
 
 
 # ── DuckDB Explorer helpers ───────────────────────────────────────────────────
@@ -2312,15 +2314,19 @@ def _render_duckdb_explorer(db_path: str):
     # Query Database
     # ═══════════════════════════════════════════════════════════════════════════
     with tab_search:
-        kw_col, btn_col = st.columns([5, 1])
-        with kw_col:
-            keyword = st.text_input(
-                "keyword_input",
-                label_visibility="collapsed",
-                placeholder="Type a keyword to search across all extracted content…",
-            )
-        with btn_col:
-            kw_search = st.button("Search", use_container_width=True, key="duckdb_kw_btn")
+        # A plain st.text_input + separate st.button doesn't submit on Enter -
+        # Enter only commits the text_input's own value, it doesn't click a
+        # nearby button. st.form makes Enter trigger the form's submit button.
+        with st.form(key="duckdb_kw_form", border=False):
+            kw_col, btn_col = st.columns([5, 1])
+            with kw_col:
+                keyword = st.text_input(
+                    "keyword_input",
+                    label_visibility="collapsed",
+                    placeholder="Type a keyword to search across all extracted content…",
+                )
+            with btn_col:
+                kw_search = st.form_submit_button("Search", use_container_width=True)
 
         if kw_search and keyword.strip():
             kw = keyword.strip()
@@ -2791,26 +2797,26 @@ def main():
         _sb_progress_slot = st.empty()
 
     # ── Main tabs ─────────────────────────────────────────────────────────────
-    # Extraction runs synchronously inside this one script execution (start to
-    # finish, for however long it takes) - if the tabs track state via reruns
-    # during that run, clicking another tab would interrupt/abort the
-    # extraction before it saves results. Only enable tab-switch reruns (needed
-    # for the Logs -> Statistics & Reports click-through) on runs that aren't
-    # actively extracting.
-    _tabs_on_change = "ignore" if extract_clicked else "rerun"
+    # Deliberately plain (no key/on_change tracking): st.tabs' state-tracking
+    # mode reruns the app on every tab switch, which both interrupted
+    # in-progress extractions and, in practice, occasionally reset the active
+    # tab back to the first one on unrelated reruns (e.g. using the DuckDB
+    # Explorer search box). Plain tabs are a pure client-side toggle - no
+    # rerun, no interruption, no reset - at the cost of not being able to
+    # jump to a tab from Python (see _on_logs_row_select for the fallback).
     if fmt == "duckdb":
         tab1, tab2, tab3, tab4 = st.tabs([
             "📁 File Processing",
             "📊 Statistics & Reports",
             "📋 Logs",
             "🦆 DuckDB Explorer",
-        ], key="main_tabs", on_change=_tabs_on_change)
+        ])
     else:
         tab1, tab2, tab3 = st.tabs([
             "📁 File Processing",
             "📊 Statistics & Reports",
             "📋 Logs",
-        ], key="main_tabs", on_change=_tabs_on_change)
+        ])
         tab4 = None
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -3272,8 +3278,11 @@ def main():
 
             st.caption(
                 f"Showing {len(filtered)} of {len(logs)} entries. "
-                "Click a row to open that session's report in Statistics & Reports."
+                "Click a row to load that session's report into Statistics & Reports."
             )
+            if st.session_state.show_nav_hint:
+                st.session_state.show_nav_hint = False
+                st.info("📊 Session loaded - open the **Statistics & Reports** tab above to view it.")
             if filtered:
                 log_df = pd.DataFrame(filtered)
                 log_event = st.dataframe(

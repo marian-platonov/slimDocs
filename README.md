@@ -235,7 +235,7 @@ The **Statistics & Reports** tab shows, for the run currently being viewed:
 
 By default this shows the **latest** run. To go back and re-examine an older one, use the Logs tab below.
 
-The **Logs** tab shows a full history of every extraction run, filterable by success / error and searchable by filename. Every run's full results stay available for the life of the browser session (not just the summary line in Logs) - **click any log row** to jump straight to that run's report in Statistics & Reports, with a banner showing which session you're viewing and a **⬅️ Back to latest** button to return.
+The **Logs** tab shows a full history of every extraction run, filterable by success / error and searchable by filename. Every run's full results stay available for the life of the browser session (not just the summary line in Logs) - **click a log row**, then open the **Statistics & Reports** tab yourself to see that run's full report, with a banner showing which session you're viewing and a **⬅️ Back to latest** button to return. (Streamlit has no reliable way to switch tabs from Python, so this is a one-click hop rather than an automatic jump.)
 
 ---
 
