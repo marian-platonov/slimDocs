@@ -1378,6 +1378,15 @@ def discover_files(root: Path, recursive: bool = True) -> list:
     )
 
 
+def _discover_skipped_files(root: Path, recursive: bool = True) -> list:
+    """Files in the folder excluded from discover_files() due to an unsupported extension."""
+    pattern = "**/*" if recursive else "*"
+    return sorted(
+        p for p in root.glob(pattern)
+        if p.is_file() and p.suffix.lower() not in _SUPPORTED_EXTENSIONS
+    )
+
+
 # ── Native dialog helpers ─────────────────────────────────────────────────────
 
 def _pick_folder() -> str | None:
@@ -1466,6 +1475,29 @@ def _build_logs(successes: list, errors: list, run_ts: str) -> list:
             "Message": e["Error"],
         })
     return logs
+
+
+def _record_error_only_run(errors: list, output_path: str, zip_output: bool) -> dict:
+    """Record a run that produced no successes, so validation failures (unsupported
+    file type, nothing left to process, etc.) still show up in Logs/Statistics
+    instead of only flashing an inline error in File Processing.
+    """
+    run_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    result = {
+        "successes":   [],
+        "errors":      errors,
+        "output_path": output_path,
+        "zip_output":  zip_output,
+        "run_ts":      run_ts,
+        "logs":        _build_logs([], errors, run_ts),
+    }
+    st.session_state.results = result
+    st.session_state.logs    = result["logs"] + st.session_state.logs
+    st.session_state.session_history[run_ts] = result
+    st.session_state.selected_session_ts = None
+    st.session_state.session_totals["runs"]   += 1
+    st.session_state.session_totals["errors"] += len(errors)
+    return result
 
 
 def process_files(
@@ -2789,8 +2821,9 @@ def main():
                 output_p.mkdir(parents=True, exist_ok=True)
 
                 # ── Resolve inputs ─────────────────────────────────────────
-                files:    list = []
-                raw_urls: list = []
+                files:         list = []
+                raw_urls:      list = []
+                skipped_files: list = []
                 scan_root: Path | None = None
                 valid = True
 
@@ -2811,6 +2844,10 @@ def main():
                         valid = False
                     elif not Path(inp).is_file():
                         st.error(f"File not found: {inp}")
+                        _record_error_only_run(
+                            [{"File": inp, "Error": "File not found"}],
+                            str(output_p), zip_output,
+                        )
                         valid = False
                     else:
                         file_ext = Path(inp).suffix.lower()
@@ -2818,6 +2855,10 @@ def main():
                             st.error(
                                 f"Unsupported file type: `{file_ext}`\n\n"
                                 f"Supported: {', '.join(sorted(_SUPPORTED_EXTENSIONS))}"
+                            )
+                            _record_error_only_run(
+                                [{"File": inp, "Error": f"Unsupported file type: '{file_ext}'"}],
+                                str(output_p), zip_output,
                             )
                             valid = False
                         else:
@@ -2834,10 +2875,17 @@ def main():
                     else:
                         with st.spinner("Scanning folder…"):
                             files = discover_files(Path(inp), recursive=recursive)
+                            skipped_files = _discover_skipped_files(Path(inp), recursive=recursive)
                         scan_root = Path(inp)
-                        if not files:
-                            st.warning("No supported files found in the selected folder.")
+                        if not files and not skipped_files:
+                            st.warning("No files found in the selected folder.")
                             valid = False
+                        elif skipped_files:
+                            st.warning(
+                                f"Skipping {len(skipped_files)} unsupported file(s): "
+                                + ", ".join(p.name for p in skipped_files[:10])
+                                + ("…" if len(skipped_files) > 10 else "")
+                            )
 
                 # ── Run extraction ─────────────────────────────────────────
                 if valid and (files or raw_urls):
@@ -2877,6 +2925,15 @@ def main():
                                 scan_root, progress_bar, status_text,
                                 st.session_state.content_map,
                             )
+                        if input_mode == "Folder" and skipped_files:
+                            _skip_errors = [
+                                {"File": str(p), "Error": f"Unsupported file type: '{p.suffix}'"}
+                                for p in skipped_files
+                            ]
+                            result["errors"] = _skip_errors + result["errors"]
+                            result["logs"] = (
+                                _build_logs([], _skip_errors, result["run_ts"]) + result["logs"]
+                            )
                         st.session_state.results = result
                         st.session_state.logs    = result["logs"] + st.session_state.logs
                         st.session_state.session_history[result["run_ts"]] = result
@@ -2906,6 +2963,17 @@ def main():
                             st.warning(f"Done - {_n_ok} OK · {_n_err} error(s)")
                         else:
                             st.success(f"✅ Done - {_n_ok} file(s) extracted")
+
+                elif valid and input_mode == "Folder" and skipped_files:
+                    # Every file in the folder was unsupported - still record a run so
+                    # the skipped files are visible in Logs/Statistics instead of vanishing.
+                    _skip_errors = [
+                        {"File": str(p), "Error": f"Unsupported file type: '{p.suffix}'"}
+                        for p in skipped_files
+                    ]
+                    _record_error_only_run(_skip_errors, str(output_p), zip_output)
+                    with _sb_progress_slot.container():
+                        st.warning(f"Done - 0 OK · {len(_skip_errors)} error(s)")
 
         # ── Results display ────────────────────────────────────────────────
         results = st.session_state.results
