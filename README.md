@@ -16,6 +16,8 @@ SlimDocs is a Streamlit web app that strips away binary file formats and gives y
 
 <img width="3440" height="1192" alt="image" src="https://github.com/user-attachments/assets/fcb171a1-8b16-46a1-8fbf-4c5a84b14965" />
 
+<img width="3440" height="1259" alt="image" src="https://github.com/user-attachments/assets/daa6b061-c90f-48da-9d50-22af2633acf6" />
+
 ---
 
 ## Requirements
